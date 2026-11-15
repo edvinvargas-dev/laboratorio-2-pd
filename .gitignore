@@ -1,0 +1,17 @@
+# Datos publicados en el GES: no forman parte del repositorio
+data/
+
+# Credenciales
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Artefactos locales
+mlruns/
+*.log
+evidencia/tmp/
