@@ -43,7 +43,7 @@ def test_misma_fecha_se_puede_pedir_dos_veces(client, pred_valida):
 def test_prediccion_no_usa_ventas_del_mismo_dia(client, deps, pred_valida):
     antes = client.post("/v1/prediccion", json=pred_valida).json()["predicciones"]
     for f in FAMILIAS:  # aunque ya existiera la venta real del día, no debe usarse
-        deps.repo.ventas[(5, dt.date.fromisoformat(FECHA), f)] = 10**6
+        deps.repo.observaciones[(5, dt.date.fromisoformat(FECHA), f)] = 10**6
     despues = client.post("/v1/prediccion", json=pred_valida).json()["predicciones"]
     assert antes == despues
 

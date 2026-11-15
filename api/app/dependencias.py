@@ -13,12 +13,47 @@ from app.servicios.repositorio import Repositorio, RepositorioMemoria
 from ml.catalogos import Catalogos, cargar_catalogos, cargar_historico
 
 
+def cargar_archivo_env(ruta: str | None) -> None:
+    """Desarrollo local: carga un archivo .env sin pisar variables ya definidas."""
+    if not ruta or not os.path.exists(ruta):
+        return
+    for linea in open(ruta, encoding="utf-8"):
+        linea = linea.strip()
+        if linea and not linea.startswith("#") and "=" in linea:
+            k, v = linea.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+
+def _url_base_datos() -> str | None:
+    """DATABASE_URL explícita, o armada con las variables APP_DB_* (las mismas del compose)."""
+    if os.getenv("DATABASE_URL"):
+        return os.environ["DATABASE_URL"]
+    if not os.getenv("APP_DB_USER"):
+        return None
+    return (f"postgresql://{os.environ['APP_DB_USER']}:{os.environ['APP_DB_PASSWORD']}"
+            f"@{os.getenv('APP_DB_HOST', 'db')}:{os.getenv('APP_DB_PORT', '5432')}/{os.environ['APP_DB_NAME']}")
+
+
 @dataclass
 class Config:
-    data_dir: str = os.getenv("DATA_DIR", "data")
-    modelo_nombre: str = os.getenv("MODELO_NOMBRE", "novamercado-pronostico")
-    modelo_alias: str = os.getenv("MODELO_ALIAS", "vigente")
-    modelo_archivo: str | None = os.getenv("MODELO_ARCHIVO")  # solo desarrollo local
+    data_dir: str = "data"
+    modelo_nombre: str = "novamercado-pronostico"
+    modelo_alias: str = "vigente"
+    modelo_archivo: str | None = None  # solo desarrollo local
+    database_url: str | None = None  # sin ella: repositorio en memoria
+    esquema_sql: str | None = None
+
+    @classmethod
+    def desde_entorno(cls) -> "Config":
+        cargar_archivo_env(os.getenv("ENV_FILE"))
+        return cls(
+            data_dir=os.getenv("DATA_DIR", "data"),
+            modelo_nombre=os.getenv("MODELO_NOMBRE", "novamercado-pronostico"),
+            modelo_alias=os.getenv("MODELO_ALIAS", "vigente"),
+            modelo_archivo=os.getenv("MODELO_ARCHIVO"),
+            database_url=_url_base_datos(),
+            esquema_sql=os.getenv("ESQUEMA_SQL"),
+        )
 
 
 @dataclass
@@ -35,16 +70,21 @@ class Dependencias:
         return self._contexto
 
 
+def construir_repositorio(cfg: Config) -> Repositorio:
+    if not cfg.database_url:
+        return RepositorioMemoria(cargar_historico(cfg.data_dir))
+    from app.servicios.repositorio_pg import RepositorioPostgres
+
+    repo = RepositorioPostgres(cfg.database_url, esquema=cfg.esquema_sql)
+    repo.inicializar(cfg.data_dir)  # esquema + histórico, solo la primera vez
+    return repo
+
+
 def construir_dependencias(cfg: Config | None = None) -> Dependencias:
-    """Desarrollo local (fase 2): repositorio en memoria con el histórico y modelo en pickle."""
-    cfg = cfg or Config()
+    cfg = cfg or Config.desde_entorno()
     cat = cargar_catalogos(cfg.data_dir)
     gestor = (
         GestorModeloArchivo(cfg.modelo_archivo, cfg.modelo_nombre, cfg.modelo_alias)
         if cfg.modelo_archivo else GestorModeloFijo(None)
     )
-    return Dependencias(
-        cat=cat, gestor=gestor,
-        repo=RepositorioMemoria(cargar_historico(cfg.data_dir)),
-        orquestador=OrquestadorFalso(),
-    )
+    return Dependencias(cat=cat, gestor=gestor, repo=construir_repositorio(cfg), orquestador=OrquestadorFalso())

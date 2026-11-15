@@ -1,7 +1,12 @@
 """Persistencia de la operación: solicitudes, predicciones, correcciones y observaciones.
 
 - RepositorioMemoria: todo en memoria (pruebas y desarrollo local).
-- (fase 4) RepositorioPostgres: la base de datos propia del producto.
+- RepositorioPostgres: la base de datos propia del producto (`repositorio_pg.py`).
+
+Semántica común:
+- `historia` devuelve las ventas conocidas: observaciones y, donde no las hay, el histórico.
+- `guardar_observacion` es idempotente: devuelve cuántos registros de observación son
+  nuevos o cambiaron de valor (reenviar lo mismo → 0).
 """
 
 from __future__ import annotations
@@ -15,6 +20,11 @@ import pandas as pd
 from app.schemas import Calidad, RespuestaPrediccion, SolicitudObservacion, SolicitudPrediccion
 
 COLUMNAS_HISTORIA = ["fecha", "tienda_id", "familia_id", "ventas"]
+Clave = tuple[int, dt.date, str]
+
+
+class RepositorioNoDisponible(Exception):
+    """La base de datos no responde (→ 503)."""
 
 
 class Repositorio(Protocol):
@@ -31,27 +41,36 @@ class Repositorio(Protocol):
         """Guarda las ventas reales; devuelve cuántos registros son nuevos o cambiaron."""
 
 
+def _a_dataframe(filas: list[tuple]) -> pd.DataFrame:
+    df = pd.DataFrame(filas, columns=COLUMNAS_HISTORIA)
+    df["fecha"] = pd.to_datetime(df["fecha"])
+    return df
+
+
 class RepositorioMemoria:
     def __init__(self, historico: pd.DataFrame | None = None):
         self._lock = threading.Lock()
-        self.ventas: dict[tuple[int, dt.date, str], int] = {}
+        self.historico: dict[Clave, int] = {}
         if historico is not None and len(historico):
             for r in historico[COLUMNAS_HISTORIA].itertuples(index=False):
-                self.ventas[(int(r.tienda_id), pd.Timestamp(r.fecha).date(), r.familia_id)] = int(r.ventas)
+                self.historico[(int(r.tienda_id), pd.Timestamp(r.fecha).date(), r.familia_id)] = int(r.ventas)
+        self.observaciones: dict[Clave, int] = {}
         self.predicciones: list[dict] = []
         self.rechazos: list[dict] = []
         self.solicitudes_observacion: list[dict] = []
+
+    @property
+    def ventas(self) -> dict[Clave, int]:
+        """Vista combinada (observación sobre histórico). Se usa en pruebas."""
+        return {**self.historico, **self.observaciones}
 
     def ping(self) -> bool:
         return True
 
     def historia(self, tienda_id: int, desde: dt.date, hasta: dt.date) -> pd.DataFrame:
-        filas = [
+        return _a_dataframe([
             (f, t, fam, v) for (t, f, fam), v in self.ventas.items() if t == tienda_id and desde <= f < hasta
-        ]
-        df = pd.DataFrame(filas, columns=COLUMNAS_HISTORIA)
-        df["fecha"] = pd.to_datetime(df["fecha"])
-        return df
+        ])
 
     def registrar_prediccion(self, crudo, solicitud, respuesta) -> None:
         with self._lock:
@@ -67,7 +86,7 @@ class RepositorioMemoria:
             self.solicitudes_observacion.append({"crudo": crudo, "solicitud": solicitud, "calidad": calidad})
             for v in solicitud.ventas:
                 clave = (solicitud.tienda_id, solicitud.fecha, v.familia_id)
-                if self.ventas.get(clave) != v.ventas:
-                    self.ventas[clave] = v.ventas
+                if self.observaciones.get(clave) != v.ventas:
+                    self.observaciones[clave] = v.ventas
                     cambios += 1
         return cambios

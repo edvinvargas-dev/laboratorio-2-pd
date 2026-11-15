@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.dependencias import Dependencias, construir_dependencias
 from app.limpieza import Rechazo, limpiar_observacion, limpiar_prediccion
@@ -26,6 +27,7 @@ from app.schemas import (
 )
 from app.servicios.orquestador import NoDisponible
 from app.servicios.prediccion import predecir
+from app.servicios.repositorio import RepositorioNoDisponible
 
 
 def create_app(deps: Dependencias | None = None) -> FastAPI:
@@ -55,13 +57,14 @@ def create_app(deps: Dependencias | None = None) -> FastAPI:
     async def _validacion(_: Request, exc: RequestValidationError):
         return JSONResponse(status_code=422, content={"detail": "; ".join(e["msg"] for e in exc.errors())})
 
+    @app.exception_handler(RepositorioNoDisponible)
+    async def _sin_base(_: Request, exc: RepositorioNoDisponible):
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
     # ------------------------------------------------------------ predicción
 
-    @app.post("/v1/prediccion", response_model=RespuestaPrediccion)
-    async def prediccion(request: Request):
-        crudo = None
+    def _prediccion(crudo: Any):
         try:
-            crudo = await cuerpo(request)
             sol, obs = limpiar_prediccion(crudo, d().contexto)
         except Rechazo as e:
             return rechazar("/v1/prediccion", crudo, e.detalle)
@@ -76,19 +79,32 @@ def create_app(deps: Dependencias | None = None) -> FastAPI:
         d().repo.registrar_prediccion(crudo, sol, resp)
         return resp
 
-    # ---------------------------------------------------------- observaciones
-
-    @app.post("/v1/observaciones", response_model=RespuestaObservacion)
-    async def observaciones(request: Request):
-        crudo = None
+    @app.post("/v1/prediccion", response_model=RespuestaPrediccion)
+    async def prediccion(request: Request):
         try:
             crudo = await cuerpo(request)
+        except Rechazo as e:
+            return await run_in_threadpool(rechazar, "/v1/prediccion", None, e.detalle)
+        return await run_in_threadpool(_prediccion, crudo)  # E/S a la base fuera del event loop
+
+    # ---------------------------------------------------------- observaciones
+
+    def _observaciones(crudo: Any):
+        try:
             sol, obs = limpiar_observacion(crudo, d().contexto)
         except Rechazo as e:
             return rechazar("/v1/observaciones", crudo, e.detalle)
         calidad = Calidad.desde(obs)
         n = d().repo.guardar_observacion(crudo, sol, calidad)
         return RespuestaObservacion(registros_guardados=n, calidad=calidad)
+
+    @app.post("/v1/observaciones", response_model=RespuestaObservacion)
+    async def observaciones(request: Request):
+        try:
+            crudo = await cuerpo(request)
+        except Rechazo as e:
+            return await run_in_threadpool(rechazar, "/v1/observaciones", None, e.detalle)
+        return await run_in_threadpool(_observaciones, crudo)
 
     # ---------------------------------------------------------- administración
 

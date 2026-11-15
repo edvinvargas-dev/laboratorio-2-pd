@@ -131,6 +131,41 @@ Los factores siguen al cuantil crítico: licores 1.47 (q* = 0.95), panadería 0.
 
 ---
 
-## 5. Criterio de reemplazo del modelo
+## 5. Persistencia
+
+- **Base propia:** PostgreSQL 17.6, en un contenedor separado del de Airflow, con volumen
+  nombrado (`db_datos`). La información sobrevive a `docker compose down` y `up`.
+- **El esquema lo aplica el servicio al arrancar** (`db/esquema.sql`, idempotente) y no
+  `docker-entrypoint-initdb.d`. Así un cambio de esquema se aplica también sobre un volumen
+  existente. Un *advisory lock* evita que dos procesos inicialicen a la vez.
+- **El histórico se carga una sola vez** con `COPY`. La marca `meta.historico_cargado` evita
+  repetir la carga al volver a levantar.
+- **Tablas:**
+
+  | Tabla | Contenido |
+  |---|---|
+  | `solicitudes` | Toda solicitud, incluidas las rechazadas, con su cuerpo original (`jsonb`), estado y versión del modelo. |
+  | `correcciones` | El bloque `calidad` de cada solicitud. |
+  | `predicciones` | Una fila por familia, con la versión del modelo y la promoción usada. |
+  | `observaciones` | Ventas reales, con llave `(tienda_id, fecha, familia_id)`. |
+  | `historico_ventas` | El histórico publicado. |
+
+- **Idempotencia:** *upsert* sobre la llave de `observaciones`. Se inserta lo nuevo y se
+  actualiza solo si el valor cambió. `RETURNING` cuenta ambos casos, que es exactamente
+  `registros_guardados`.
+- **Corrección de una observación:** si llega un valor distinto para el mismo día, tienda
+  y familia, prevalece el último. Se registra la solicitud que lo cambió (`solicitud_id`,
+  `actualizada_en`).
+- **Histórico y observaciones en tablas separadas,** unidas por la vista `ventas_conocidas`
+  (la observación prevalece). La vista `ventas_entrenamiento` agrega la promoción: las
+  observaciones no la traen, así que se toma la de la última solicitud de predicción de ese
+  día, que es la que el modelo usó.
+- **Si la base no responde:** las operaciones que la necesitan responden 503 y `/health`
+  pasa a `degradado`. El pool verifica cada conexión antes de usarla, así que el servicio
+  se recupera solo cuando la base vuelve.
+
+---
+
+## 6. Criterio de reemplazo del modelo
 
 *(Fase 5–6: pendiente.)*
