@@ -50,7 +50,8 @@ def ejecutar(data_dir: str, database_url: str | None = None, etiquetas: dict | N
 
     if vigente is not None and dias_nuevos < DIAS_MINIMOS:
         return {"estado": "exitoso", "promovido": False, "version": version_vigente,
-                "motivo": f"Solo {dias_nuevos} días nuevos desde el vigente (versión {version_vigente}); "
+                "motivo": f"Solo {dias_nuevos} {'día nuevo' if dias_nuevos == 1 else 'días nuevos'} "
+                          f"desde el vigente (versión {version_vigente}); "
                           f"se necesitan {DIAS_MINIMOS} para comparar. No se entrenó."}
 
     dataset = preparar_dataset(datos, cat)

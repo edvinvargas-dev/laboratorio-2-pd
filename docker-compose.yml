@@ -1,9 +1,70 @@
-# NovaMercado — producto completo con `docker compose up`.
-# Fase 4: base de datos propia del producto. (API, MLflow y Airflow se agregan en fases siguientes.)
+# NovaMercado — producto completo con `docker compose up` (ver README.md).
+#
+#   api        FastAPI, puerto 8000 (contrato del Anexo)
+#   arranque   una vez por `up`: esquema + histórico + primer modelo si no existe
+#   db         PostgreSQL propia del producto
+#   mlflow     tracking + Model Registry (alias `vigente`)
+#   airflow    DAG `reentrenamiento` (con su propia base `airflow-db`)
+#
+# Los datos publicados se montan desde ./data (no forman parte de las imágenes).
 
 name: novamercado
 
+x-entorno-producto: &entorno-producto
+  APP_DB_NAME: ${APP_DB_NAME}
+  APP_DB_USER: ${APP_DB_USER}
+  APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+  APP_DB_HOST: db
+  APP_DB_PORT: "5432"
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MODELO_NOMBRE: novamercado-pronostico
+  MODELO_ALIAS: vigente
+
 services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: novamercado-api:1.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mlflow:
+        condition: service_started  # la API tolera un MLflow caído (usa su caché)
+    environment:
+      <<: *entorno-producto
+      AIRFLOW_URL: http://airflow:8080
+      AIRFLOW_USUARIO: ${AIRFLOW_USUARIO}
+      AIRFLOW_CLAVE: ${AIRFLOW_CLAVE}
+      INTERVALO_MODELO_SEG: "15"
+    volumes:
+      - ./data:/srv/data:ro
+      - api_cache_modelo:/srv/cache_modelo
+    ports:
+      - "8000:8000"
+    healthcheck:  # vivo = responde (200 ok/degradado o 503 sin modelo)
+      test: ["CMD", "python", "-c", "import urllib.request as u, urllib.error as e\ntry: u.urlopen('http://localhost:8000/health', timeout=3)\nexcept e.HTTPError: pass"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  arranque:
+    image: novamercado-api:1.0
+    command: ["python", "-m", "app.arranque"]
+    restart: on-failure
+    depends_on:
+      db:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+      api:
+        condition: service_started  # misma imagen: se construye una sola vez
+    environment:
+      <<: *entorno-producto
+    volumes:
+      - ./data:/srv/data:ro
+
   db:
     image: postgres:17.6-bookworm
     restart: unless-stopped
@@ -95,6 +156,7 @@ services:
       retries: 40
 
 volumes:
+  api_cache_modelo:
   db_datos:
   mlflow_datos:
   airflow_db_datos:
