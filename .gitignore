@@ -13,6 +13,7 @@ __pycache__/
 
 # Artefactos locales
 modelos_locales/
+cache_modelo/
 mlruns/
 *.log
 evidencia/tmp/

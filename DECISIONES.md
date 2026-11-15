@@ -166,6 +166,79 @@ Los factores siguen al cuantil crítico: licores 1.47 (q* = 0.95), panadería 0.
 
 ---
 
-## 6. Criterio de reemplazo del modelo
+## 6. Gestión de modelos con MLflow
 
-*(Fase 5–6: pendiente.)*
+- **Servidor:** `mlflow` (imagen fija `ghcr.io/mlflow/mlflow:v3.17.2`) con backend SQLite y
+  artefactos servidos por el propio servidor (`--serve-artifacts`), todo en el volumen
+  `mlflow_datos`. Los clientes suben y descargan por HTTP, sin carpetas compartidas.
+- **Cada entrenamiento es un run** del experimento `novamercado-pronostico`, con:
+  parámetros (fechas de corte, iteraciones, hiperparámetros); métricas técnicas (MAE,
+  RMSE, WAPE, sesgo) y de negocio (costo total, por familia, del baseline y del vigente
+  en la misma ventana); factores de cantidad sugerida; importancias; y un resumen de
+  los datos usados (rango, filas del histórico y de la operación, promociones
+  desconocidas).
+- **Cada candidato se registra** como versión de `novamercado-pronostico`, se promueva o
+  no. Las etiquetas `promovido` y `motivo` dejan el linaje de cada decisión.
+- **El modelo vigente es el que tiene el alias `vigente`.** Al promover, el anterior
+  conserva el alias `anterior`, que permite volver atrás manualmente.
+- **El alias se mueve en el último paso.** Si algo falla antes (datos, entrenamiento,
+  registro, MLflow caído), el vigente no cambia.
+
+### El servicio sigue al alias
+
+- Un hilo revisa MLflow cada 15 s. Si el alias apunta a otra versión, la descarga y la
+  cambia en caliente. En la prueba, el servicio usó el modelo nuevo **14 s** después de
+  terminar el reentrenamiento (requisito: menos de 2 min).
+- **Si MLflow no responde,** se sigue sirviendo con el modelo cargado y `/health` pasa a
+  `degradado` en **8 s** (requisito: menos de 1 min). Al volver MLflow, `ok` en **29 s**,
+  incluido el arranque del contenedor (requisito: menos de 2 min).
+- **Cada modelo cargado se guarda en una caché local** (volumen). Si la API se reinicia
+  con MLflow caído, arranca con la última versión conocida en lugar de quedarse sin
+  modelo.
+- **Alternativa descartada: cargar el modelo solo al arrancar.** Exigiría reiniciar el
+  servicio en cada promoción.
+
+---
+
+## 7. Criterio de reemplazo del modelo
+
+Implementado en `ml/criterio.py` y ejecutado automáticamente al final de cada
+reentrenamiento.
+
+**Ventana de evaluación:** los días posteriores a los datos del vigente (como máximo los
+últimos 28), es decir, días que **ninguno** de los dos modelos vio. El candidato se
+evalúa con su versión entrenada antes de esa ventana. El vigente se evalúa prediciendo
+esos días con las mismas features. En la prueba, el costo del vigente calculado así
+(52 987) coincidió exactamente con el costo real que acumularon sus sugerencias en la
+operación simulada.
+
+**Reglas, en orden:**
+
+1. El candidato debe ser válido: costo finito y sugerencias enteras ≥ 0.
+2. Debe costar **menos que el baseline** en la ventana (control de cordura).
+3. Si no hay vigente, o no se puede evaluar, se promueve. Así se cubre el arranque desde
+   cero.
+4. Se necesitan **al menos 7 días nuevos** desde los datos del vigente. Si no los hay, no
+   se entrena y se responde `promovido: false`.
+5. **No-regresión:** se promueve si el costo del candidato **no supera al del vigente en
+   más de un 2%**.
+
+**Por qué no-regresión y no "mejora mínima".** La versión del candidato que se evalúa,
+igual que el vigente, no ve los días nuevos. La ventaja real del candidato está en la
+versión que se despliega, reentrenada con todos los datos, incluido un posible cambio
+de demanda, y esa ventaja no se puede medir sin días futuros. La primera versión del
+criterio exigía mejorar un 1%. En la prueba con demanda +25%, el candidato mejoró un
+2.2%, pero esa diferencia era azar, no adaptación. Exigir mejora vuelve la promoción
+casi aleatoria y retrasa la adopción de datos nuevos. Con no-regresión, el sistema
+adopta el modelo más reciente salvo que sea **claramente peor**, que es la señal de un
+entrenamiento roto o de datos defectuosos.
+
+**Por qué 2%.** El candidato evaluado tiene 28 días menos de datos que el vigente (los de
+calibración). Diferencias de ese orden se explican por eso y por ruido.
+
+**Alternativas descartadas:**
+- Promover siempre: sin protección ante un entrenamiento degradado.
+- Comparar sobre los últimos 28 días aunque el vigente los haya visto: sesgado a favor del
+  vigente.
+- Usar MAE como criterio: el negocio paga el costo de la cantidad sugerida, no el error
+  del pronóstico.

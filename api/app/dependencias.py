@@ -42,6 +42,9 @@ class Config:
     modelo_archivo: str | None = None  # solo desarrollo local
     database_url: str | None = None  # sin ella: repositorio en memoria
     esquema_sql: str | None = None
+    mlflow_uri: str | None = None  # con ella: el modelo sigue el alias del Model Registry
+    cache_modelo: str = "cache_modelo"
+    intervalo_modelo: float = 15.0
 
     @classmethod
     def desde_entorno(cls) -> "Config":
@@ -53,6 +56,9 @@ class Config:
             modelo_archivo=os.getenv("MODELO_ARCHIVO"),
             database_url=_url_base_datos(),
             esquema_sql=os.getenv("ESQUEMA_SQL"),
+            mlflow_uri=os.getenv("MLFLOW_TRACKING_URI"),
+            cache_modelo=os.getenv("CACHE_MODELO", "cache_modelo"),
+            intervalo_modelo=float(os.getenv("INTERVALO_MODELO_SEG", "15")),
         )
 
 
@@ -83,8 +89,17 @@ def construir_repositorio(cfg: Config) -> Repositorio:
 def construir_dependencias(cfg: Config | None = None) -> Dependencias:
     cfg = cfg or Config.desde_entorno()
     cat = cargar_catalogos(cfg.data_dir)
-    gestor = (
-        GestorModeloArchivo(cfg.modelo_archivo, cfg.modelo_nombre, cfg.modelo_alias)
-        if cfg.modelo_archivo else GestorModeloFijo(None)
-    )
-    return Dependencias(cat=cat, gestor=gestor, repo=construir_repositorio(cfg), orquestador=OrquestadorFalso())
+    return Dependencias(cat=cat, gestor=construir_gestor(cfg), repo=construir_repositorio(cfg),
+                        orquestador=OrquestadorFalso())
+
+
+def construir_gestor(cfg: Config) -> GestorModelo:
+    if cfg.mlflow_uri:
+        from app.servicios.modelo_mlflow import FuenteMLflow, GestorModeloMLflow
+
+        fuente = FuenteMLflow(cfg.mlflow_uri, cfg.modelo_nombre, cfg.modelo_alias)
+        return GestorModeloMLflow(fuente, cfg.modelo_nombre, cfg.modelo_alias, cfg.cache_modelo,
+                                  cfg.intervalo_modelo).iniciar()
+    if cfg.modelo_archivo:
+        return GestorModeloArchivo(cfg.modelo_archivo, cfg.modelo_nombre, cfg.modelo_alias)
+    return GestorModeloFijo(None)

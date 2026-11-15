@@ -67,6 +67,8 @@ class Resultado:
     pronosticador: Pronosticador  # el que se despliega
     metricas_prueba: dict
     modelo_eval: object  # modelo entrenado sin calibración/prueba (para importancias)
+    X_prueba: pd.DataFrame | None = None  # para evaluar otros modelos sobre los mismos días
+    y_prueba: pd.Series | None = None
 
 
 def crear_modelo(tipo: str, **kw):
@@ -80,10 +82,14 @@ def entrenar_candidato(
     dias_prueba: int = DIAS_PRUEBA,
     dias_calibracion: int = DIAS_CALIBRACION,
     reajustar: bool = True,
+    inicio_prueba: pd.Timestamp | None = None,
+    datos: tuple[pd.DataFrame, pd.Series] | None = None,
 ) -> Resultado:
-    X, y = preparar_dataset(historia, cat)
+    """`inicio_prueba` fija el primer día de la ventana de prueba (por defecto, los últimos
+    `dias_prueba` días). `datos` permite reutilizar un dataset ya preparado."""
+    X, y = datos if datos is not None else preparar_dataset(historia, cat)
     fin = X.fecha.max()
-    ini_prueba = fin - pd.Timedelta(days=dias_prueba - 1)
+    ini_prueba = pd.Timestamp(inicio_prueba) if inicio_prueba is not None else fin - pd.Timedelta(days=dias_prueba - 1)
     ini_calib = ini_prueba - pd.Timedelta(days=dias_calibracion)
     tr = X.fecha < ini_calib
     ca = (X.fecha >= ini_calib) & (X.fecha < ini_prueba)
@@ -105,8 +111,9 @@ def entrenar_candidato(
         "inicio_prueba": str(ini_prueba.date()),
         "n_filas": int(len(X)),
         "n_iter": int(getattr(modelo, "n_iter", 0)),
+        "dias_prueba": int(X.fecha[te].nunique()),
     }
-    return Resultado(Pronosticador(final, factores, info), metricas, modelo)
+    return Resultado(Pronosticador(final, factores, info), metricas, modelo, X[te], y[te])
 
 
 def main() -> None:

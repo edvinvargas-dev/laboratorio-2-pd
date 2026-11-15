@@ -7,6 +7,8 @@ Ejecutar en local (desde la raíz del repo):
 from __future__ import annotations
 
 import json
+import logging
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -30,8 +32,17 @@ from app.servicios.prediccion import predecir
 from app.servicios.repositorio import RepositorioNoDisponible
 
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
 def create_app(deps: Dependencias | None = None) -> FastAPI:
-    app = FastAPI(title="NovaMercado — Pronóstico diario de ventas", version="1.0.0")
+    @asynccontextmanager
+    async def ciclo_de_vida(app: FastAPI):
+        if app.state.deps is None:  # arranque real: conectar y empezar a seguir el modelo ya
+            app.state.deps = await run_in_threadpool(construir_dependencias)
+        yield
+
+    app = FastAPI(title="NovaMercado — Pronóstico diario de ventas", version="1.0.0", lifespan=ciclo_de_vida)
     app.state.deps = deps
 
     def d() -> Dependencias:
