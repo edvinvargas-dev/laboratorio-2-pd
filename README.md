@@ -125,7 +125,13 @@ curl http://localhost:8000/health
 python scripts/probar_ejemplos.py       # envía data/ejemplos y guarda las respuestas en evidencia/
 python scripts/simular_operacion.py --desde 2026-03-01 --dias 7 --factor 1.2   # días simulados
 python scripts/reentrenar.py            # dispara un reentrenamiento y espera el resultado
+python scripts/evaluador.py --proyecto novamercado   # 28 días como el evaluador: defectos, reentrenos,
+                                                     # caída de MLflow, down/up y cambio de demanda
 ```
+
+El último resultado del evaluador (producto clonado desde GitHub y levantado desde cero) está
+en [evidencia/evaluacion.md](evidencia/evaluacion.md): **0 errores de contrato** en 3 204
+predicciones y un costo **39% menor** que el baseline.
 
 ---
 

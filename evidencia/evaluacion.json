@@ -1,0 +1,187 @@
+{
+ "dias": 28,
+ "predicciones": 3204,
+ "errores_contrato": [],
+ "costo_total": 107669,
+ "costo_baseline": 176468,
+ "ahorro_vs_baseline": 0.3899,
+ "mae": 46.11,
+ "por_semana": [
+  {
+   "semana": 1,
+   "costo": 20564.9,
+   "costo_baseline": 30360.8,
+   "mae": 36.392,
+   "ahorro_vs_baseline": 0.323
+  },
+  {
+   "semana": 2,
+   "costo": 20148.8,
+   "costo_baseline": 35385.6,
+   "mae": 36.676,
+   "ahorro_vs_baseline": 0.431
+  },
+  {
+   "semana": 3,
+   "costo": 33844.2,
+   "costo_baseline": 61446.9,
+   "mae": 56.601,
+   "ahorro_vs_baseline": 0.449
+  },
+  {
+   "semana": 4,
+   "costo": 33111.3,
+   "costo_baseline": 49274.5,
+   "mae": 52.987,
+   "ahorro_vs_baseline": 0.328
+  }
+ ],
+ "por_familia": [
+  {
+   "familia_id": "abarrotes",
+   "costo": 13560.0,
+   "costo_baseline": 32380.0
+  },
+  {
+   "familia_id": "bebe",
+   "costo": 1369.0,
+   "costo_baseline": 3152.0
+  },
+  {
+   "familia_id": "bebidas",
+   "costo": 9325.0,
+   "costo_baseline": 23113.0
+  },
+  {
+   "familia_id": "carnes",
+   "costo": 15640.0,
+   "costo_baseline": 18754.0
+  },
+  {
+   "familia_id": "cuidado_personal",
+   "costo": 2243.0,
+   "costo_baseline": 6926.0
+  },
+  {
+   "familia_id": "frutas_verduras",
+   "costo": 18723.0,
+   "costo_baseline": 22248.0
+  },
+  {
+   "familia_id": "lacteos",
+   "costo": 18573.0,
+   "costo_baseline": 22216.0
+  },
+  {
+   "familia_id": "licores",
+   "costo": 1503.0,
+   "costo_baseline": 7252.0
+  },
+  {
+   "familia_id": "limpieza",
+   "costo": 2741.0,
+   "costo_baseline": 8763.0
+  },
+  {
+   "familia_id": "mascotas",
+   "costo": 1135.0,
+   "costo_baseline": 1915.0
+  },
+  {
+   "familia_id": "panaderia",
+   "costo": 16184.0,
+   "costo_baseline": 18296.0
+  },
+  {
+   "familia_id": "snacks",
+   "costo": 6674.0,
+   "costo_baseline": 11453.0
+  }
+ ],
+ "calidad": {
+  "pred ok": 184,
+  "pred corregido": 69,
+  "pred advertencia": 14,
+  "obs ok": 190,
+  "obs advertencia": 3,
+  "obs corregido": 74
+ },
+ "defectos_enviados": {
+  "pred:clave_tienda": 10,
+  "pred:promo_nula": 5,
+  "pred:fecha": 10,
+  "pred:envuelta": 13,
+  "obs:familia_nombre": 16,
+  "obs:miles": 16,
+  "pred:tienda_texto": 8,
+  "pred:promo_formato": 5,
+  "obs:fecha": 20,
+  "obs:clave_ventas": 19,
+  "pred:familias_objeto": 10,
+  "obs:decimal_coma": 17,
+  "pred:campo_extra": 5,
+  "pred:clave_promo": 10,
+  "pred:familia_nombre": 7
+ },
+ "status_http": {
+  "pred 200": 267,
+  "obs 200": 267
+ },
+ "versiones_usadas": {
+  "1": 63,
+  "2": 64,
+  "3": 70,
+  "4": 70
+ },
+ "eventos": [
+  {
+   "dia": "2026-03-08",
+   "evento": "reentrenar",
+   "segundos": 70,
+   "adopcion_seg": 0,
+   "estado": "exitoso",
+   "promovido": true,
+   "version": "2",
+   "motivo": "Costo en validación 20 949 vs 20 565 del vigente (+1.9%, 7 días); se adopta el modelo con datos más recientes",
+   "version_candidata": "2"
+  },
+  {
+   "dia": "2026-03-10",
+   "evento": "mlflow_detenido",
+   "degradado_seg": 14.264384984970093
+  },
+  {
+   "dia": "2026-03-12",
+   "evento": "mlflow_iniciado",
+   "ok_seg": 12.298536539077759
+  },
+  {
+   "dia": "2026-03-15",
+   "evento": "reentrenar",
+   "segundos": 51,
+   "adopcion_seg": 2,
+   "estado": "exitoso",
+   "promovido": true,
+   "version": "3",
+   "motivo": "Costo en validación 19 446 vs 20 149 del vigente (-3.5%, 7 días); se adopta el modelo con datos más recientes",
+   "version_candidata": "3"
+  },
+  {
+   "dia": "2026-03-18",
+   "evento": "down_up",
+   "ok_seg": 30.628878116607666,
+   "total_seg": 59
+  },
+  {
+   "dia": "2026-03-22",
+   "evento": "reentrenar",
+   "segundos": 88,
+   "adopcion_seg": 6,
+   "estado": "exitoso",
+   "promovido": true,
+   "version": "4",
+   "motivo": "Costo en validación 34 103 vs 33 844 del vigente (+0.8%, 7 días); se adopta el modelo con datos más recientes",
+   "version_candidata": "4"
+  }
+ ]
+}

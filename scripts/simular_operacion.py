@@ -1,6 +1,6 @@
 """Simula la operación diaria de las tiendas contra la API (evaluador propio).
 
-Las "ventas reales" de cada día simulado salen del histórico de un año antes,
+Las "ventas reales" de cada día simulado salen del histórico de 52 semanas antes,
 multiplicadas por `--factor` (permite simular un cambio de demanda). Cada día:
   1. se envía la observación del día anterior;
   2. se pide el pronóstico del día (con las promociones del histórico).
@@ -47,7 +47,8 @@ def main() -> None:
     tiendas = [int(t) for t in a.tiendas.split(",")] if a.tiendas else sorted(hist.tienda_id.unique())
 
     def reales(dia: pd.Timestamp) -> pd.DataFrame:
-        base = hist[(hist.fecha == dia - pd.DateOffset(years=1)) & hist.tienda_id.isin(tiendas)].copy()
+        # 364 días = 52 semanas: conserva el día de la semana
+        base = hist[(hist.fecha == dia - pd.Timedelta(days=364)) & hist.tienda_id.isin(tiendas)].copy()
         base["ventas"] = (base.ventas * a.factor).round().astype(int)
         base["fecha"] = dia
         return base
