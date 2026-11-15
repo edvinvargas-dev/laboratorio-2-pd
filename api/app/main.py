@@ -129,7 +129,10 @@ def create_app(deps: Dependencias | None = None) -> FastAPI:
     @app.get("/admin/reentrenar/{id_ejecucion}", response_model=RespuestaReentrenarEstado,
              response_model_exclude_none=True)
     def estado_reentrenamiento(id_ejecucion: str):
-        est = d().orquestador.estado(id_ejecucion)
+        try:
+            est = d().orquestador.estado(id_ejecucion)
+        except NoDisponible as e:
+            raise HTTPException(503, f"No se puede consultar el reentrenamiento: {e}") from None
         if est is None:
             raise HTTPException(404, f"Ejecución {id_ejecucion!r} desconocida")
         return est

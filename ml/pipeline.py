@@ -97,9 +97,13 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default=os.getenv("DATA_DIR", "data"))
+    ap.add_argument("--una-linea", action="store_true",
+                    help="imprime el resultado como JSON en la última línea (lo lee Airflow como XCom)")
+    ap.add_argument("--etiqueta", action="append", default=[], help="clave=valor para el run de MLflow")
     a = ap.parse_args()
-    url = os.getenv("DATABASE_URL")
-    print(json.dumps(ejecutar(a.data, url, {"origen": "cli"}), ensure_ascii=False, indent=2))
+    etiquetas = {"origen": "cli", **dict(e.split("=", 1) for e in a.etiqueta)}
+    resultado = ejecutar(a.data, os.getenv("DATABASE_URL"), etiquetas)
+    print(json.dumps(resultado, ensure_ascii=False, indent=None if a.una_linea else 2))
 
 
 if __name__ == "__main__":

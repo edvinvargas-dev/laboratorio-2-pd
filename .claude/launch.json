@@ -24,7 +24,8 @@
       "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "api", "--port", "8000"],
       "env": {
         "DATA_DIR": "data", "PYTHONPATH": ".", "ENV_FILE": ".env", "APP_DB_HOST": "localhost", "APP_DB_PORT": "5433",
-        "MLFLOW_TRACKING_URI": "http://localhost:5000", "CACHE_MODELO": "cache_modelo", "MLFLOW_DISABLE_AGENT_HINT": "1"
+        "MLFLOW_TRACKING_URI": "http://localhost:5000", "CACHE_MODELO": "cache_modelo", "MLFLOW_DISABLE_AGENT_HINT": "1",
+        "AIRFLOW_URL": "http://localhost:8080"
       },
       "port": 8000
     }

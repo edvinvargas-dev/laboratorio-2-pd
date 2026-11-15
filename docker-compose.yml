@@ -25,7 +25,7 @@ services:
     image: ghcr.io/mlflow/mlflow:v3.17.2
     restart: unless-stopped
     command: >
-      mlflow server --host 0.0.0.0 --port 5000
+      mlflow server --host 0.0.0.0 --port 5000 --workers 1
       --backend-store-uri sqlite:////mlflow/mlflow.db
       --artifacts-destination /mlflow/artifacts --serve-artifacts
       --allowed-hosts "mlflow,mlflow:5000,localhost,localhost:5000,127.0.0.1,127.0.0.1:5000"
@@ -39,6 +39,63 @@ services:
       timeout: 5s
       retries: 30
 
+  # Base de metadatos de Airflow: separada de la base del producto
+  airflow-db:
+    image: postgres:17.6-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+    volumes:
+      - airflow_db_datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  airflow:
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    image: novamercado-airflow:1.0
+    restart: unless-stopped
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "${AIRFLOW_USUARIO}:admin"
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+      AIRFLOW__API__SECRET_KEY: ${AIRFLOW_JWT_SECRET}
+      AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "True"
+      AIRFLOW_USUARIO: ${AIRFLOW_USUARIO}
+      AIRFLOW_CLAVE: ${AIRFLOW_CLAVE}
+      # Lo que necesitan las tareas del DAG
+      DATABASE_URL: postgresql://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DATA_DIR: /opt/proyecto/data
+    # La clave del usuario sale de .env: se escribe en el archivo de SimpleAuthManager al arrancar
+    command: >
+      bash -c 'printf "{\"%s\": \"%s\"}" "$$AIRFLOW_USUARIO" "$$AIRFLOW_CLAVE"
+      > /opt/airflow/simple_auth_manager_passwords.json.generated && exec airflow standalone'
+    volumes:
+      - ./data:/opt/proyecto/data:ro
+      - airflow_logs:/opt/airflow/logs
+    ports:
+      - "${AIRFLOW_PORT_HOST:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+
 volumes:
   db_datos:
   mlflow_datos:
+  airflow_db_datos:
+  airflow_logs:

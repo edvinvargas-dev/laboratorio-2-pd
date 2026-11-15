@@ -1,0 +1,13 @@
+.git
+.venv
+.claude
+data
+evidencia
+notebooks
+cache_modelo
+modelos_locales
+mlruns
+**/__pycache__
+**/.pytest_cache
+**/tests
+.env

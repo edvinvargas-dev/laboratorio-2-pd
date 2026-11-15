@@ -200,7 +200,58 @@ Los factores siguen al cuantil crítico: licores 1.47 (q* = 0.95), panadería 0.
 
 ---
 
-## 7. Criterio de reemplazo del modelo
+## 7. Ciclo de reentrenamiento con Airflow
+
+- **DAG `reentrenamiento`** (`airflow/dags/reentrenamiento.py`), sin calendario: se
+  dispara desde `POST /admin/reentrenar`. Tiene dos tareas:
+  1. `validar_insumos`: base de datos, MLflow y archivos disponibles. Falla en segundos y
+     con un mensaje claro.
+  2. `reentrenar`: ejecuta `ml.pipeline` con el histórico y las observaciones de la base
+     (vista `ventas_entrenamiento`). La última línea de su salida (JSON con estado,
+     promovido, versión y motivo) queda como XCom.
+- **Entorno aislado para el modelo.** La imagen de Airflow trae sus propias versiones de
+  pandas y numpy, fijadas por sus *constraints*. Las tareas usan un *virtualenv* dentro
+  de la imagen (`/home/airflow/ml-venv`) con exactamente las versiones de
+  `ml/requirements.txt`. Así no hay conflictos y se entrena con el mismo código y las
+  mismas versiones que en desarrollo.
+  **Alternativa descartada:** instalar el modelo en el Python de Airflow, que rompe sus
+  constraints. **Otra descartada:** `PythonVirtualenvOperator`, que crea el entorno en
+  cada ejecución y es lento.
+- **Ids propios.** La API crea el dag_run con id `rt_<uuid>`, que es el `id` del contrato.
+  Traducción de estados:
+
+  | Airflow | Contrato |
+  |---|---|
+  | `queued` / `running` | `en_curso` |
+  | `success` | `exitoso` (lee el XCom) |
+  | `failed` | `fallido`, con la versión vigente y la tarea que falló |
+
+  Un id que Airflow no conoce responde 404. Como Airflow guarda las ejecuciones, el
+  estado se puede consultar aunque la API se reinicie.
+- **Airflow caído o el DAG no disponible:** `POST /admin/reentrenar` responde 503, igual
+  que la consulta de estado. `/health` pasa a `degradado`.
+- `max_active_runs=1`: dos disparos seguidos se ejecutan uno tras otro.
+  `dagrun_timeout` = 10 min, igual que el límite del enunciado.
+- **Despliegue:** `airflow standalone` (scheduler, dag-processor, api-server y triggerer en
+  un contenedor) con `LocalExecutor`, y una base PostgreSQL de metadatos **separada** de la
+  del producto. **Alternativa descartada:** un contenedor por componente, que es lo
+  habitual en producción. Con el límite de memoria de Docker Desktop (6 GB para todo el
+  producto) no deja margen. Un solo contenedor usa unos 1.2 GB.
+- **Autenticación:** SimpleAuthManager con un usuario cuya clave viene de `.env`. La API
+  obtiene un token JWT de `/auth/token` y lo renueva si vence.
+
+**Pruebas reales:**
+
+| Caso | Resultado |
+|---|---|
+| Sin días nuevos | `exitoso`, no promovido, en 24 s |
+| Con 7 días nuevos | versión 3 promovida en 33 s; el servicio la usó 5 s después |
+| MLflow caído | `fallido` en 12 s ("Falló la tarea validar_insumos"); la versión 3 siguió vigente |
+| Airflow caído | 503 al disparar |
+
+---
+
+## 8. Criterio de reemplazo del modelo
 
 Implementado en `ml/criterio.py` y ejecutado automáticamente al final de cada
 reentrenamiento.

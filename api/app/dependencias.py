@@ -43,6 +43,9 @@ class Config:
     database_url: str | None = None  # sin ella: repositorio en memoria
     esquema_sql: str | None = None
     mlflow_uri: str | None = None  # con ella: el modelo sigue el alias del Model Registry
+    airflow_url: str | None = None  # con ella: el reentrenamiento se dispara en Airflow
+    airflow_usuario: str = ""
+    airflow_clave: str = ""
     cache_modelo: str = "cache_modelo"
     intervalo_modelo: float = 15.0
 
@@ -57,6 +60,9 @@ class Config:
             database_url=_url_base_datos(),
             esquema_sql=os.getenv("ESQUEMA_SQL"),
             mlflow_uri=os.getenv("MLFLOW_TRACKING_URI"),
+            airflow_url=os.getenv("AIRFLOW_URL"),
+            airflow_usuario=os.getenv("AIRFLOW_USUARIO", ""),
+            airflow_clave=os.getenv("AIRFLOW_CLAVE", ""),
             cache_modelo=os.getenv("CACHE_MODELO", "cache_modelo"),
             intervalo_modelo=float(os.getenv("INTERVALO_MODELO_SEG", "15")),
         )
@@ -89,8 +95,21 @@ def construir_repositorio(cfg: Config) -> Repositorio:
 def construir_dependencias(cfg: Config | None = None) -> Dependencias:
     cfg = cfg or Config.desde_entorno()
     cat = cargar_catalogos(cfg.data_dir)
-    return Dependencias(cat=cat, gestor=construir_gestor(cfg), repo=construir_repositorio(cfg),
-                        orquestador=OrquestadorFalso())
+    gestor = construir_gestor(cfg)
+    return Dependencias(cat=cat, gestor=gestor, repo=construir_repositorio(cfg),
+                        orquestador=construir_orquestador(cfg, gestor))
+
+
+def construir_orquestador(cfg: Config, gestor: GestorModelo) -> Orquestador:
+    if not cfg.airflow_url:
+        return OrquestadorFalso()
+    from app.servicios.orquestador_airflow import OrquestadorAirflow
+
+    def version_vigente() -> str | None:
+        m = gestor.actual()
+        return m.version if m else None
+
+    return OrquestadorAirflow(cfg.airflow_url, cfg.airflow_usuario, cfg.airflow_clave, version_vigente)
 
 
 def construir_gestor(cfg: Config) -> GestorModelo:
