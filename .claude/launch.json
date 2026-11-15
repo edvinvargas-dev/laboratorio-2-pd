@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api-local",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "api", "--port", "8000"],
+      "env": { "DATA_DIR": "data", "MODELO_ARCHIVO": "modelos_locales/pronosticador.pkl", "PYTHONPATH": "." },
+      "port": 8000
+    }
+  ]
+}

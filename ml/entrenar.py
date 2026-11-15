@@ -112,6 +112,7 @@ def entrenar_candidato(
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data")
+    ap.add_argument("--guardar", help="ruta .pkl donde guardar el Pronosticador LightGBM (desarrollo local)")
     args = ap.parse_args()
 
     cat = cargar_catalogos(args.data)
@@ -138,6 +139,15 @@ def main() -> None:
     }).sort_values("q_critico")
     print("\nPor familia:\n", fam.to_string())
     print("\nImportancia (gain) top 15:\n", (resultados["lgbm"].modelo_eval.importancia().head(15) / 1e6).round(2).to_string())
+
+    if args.guardar:
+        import pickle
+        from pathlib import Path
+
+        Path(args.guardar).parent.mkdir(parents=True, exist_ok=True)
+        with open(args.guardar, "wb") as f:
+            pickle.dump(resultados["lgbm"].pronosticador, f)
+        print(f"\nPronosticador guardado en {args.guardar}")
 
 
 if __name__ == "__main__":
