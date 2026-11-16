@@ -1,0 +1,307 @@
+[
+  {
+    "caso": "Tienda inexistente",
+    "solicitud": "POST /v1/prediccion",
+    "cuerpo": {
+      "tienda_id": 99,
+      "fecha": "2026-03-29",
+      "familias": [
+        {
+          "familia_id": "abarrotes",
+          "en_promocion": 0
+        }
+      ]
+    },
+    "status": 422,
+    "respuesta": {
+      "detail": "tienda_id 99 no existe en el catálogo de tiendas"
+    }
+  },
+  {
+    "caso": "Fecha imposible",
+    "solicitud": "POST /v1/prediccion",
+    "cuerpo": {
+      "tienda_id": 5,
+      "fecha": "2026-02-30",
+      "familias": [
+        {
+          "familia_id": "abarrotes",
+          "en_promocion": 0
+        }
+      ]
+    },
+    "status": 422,
+    "respuesta": {
+      "detail": "fecha inválida: '2026-02-30' no es una fecha válida del calendario"
+    }
+  },
+  {
+    "caso": "Fecha anterior a la apertura de la tienda",
+    "solicitud": "POST /v1/prediccion",
+    "cuerpo": {
+      "tienda_id": 10,
+      "fecha": "2025-01-10",
+      "familias": [
+        {
+          "familia_id": "abarrotes",
+          "en_promocion": 0
+        }
+      ]
+    },
+    "status": 422,
+    "respuesta": {
+      "detail": "la tienda 10 abrió el 2025-03-15; no hay ventas el 2025-01-10"
+    }
+  },
+  {
+    "caso": "Campos en conflicto (tienda_id y tienda)",
+    "solicitud": "POST /v1/prediccion",
+    "cuerpo": {
+      "tienda_id": 5,
+      "tienda": 3,
+      "fecha": "2026-03-29",
+      "familias": [
+        {
+          "familia_id": "abarrotes",
+          "en_promocion": 0
+        }
+      ]
+    },
+    "status": 422,
+    "respuesta": {
+      "detail": "tienda_id: llegan valores distintos en 'tienda_id' y 'tienda'"
+    }
+  },
+  {
+    "caso": "Ninguna familia válida",
+    "solicitud": "POST /v1/prediccion",
+    "cuerpo": {
+      "tienda_id": 5,
+      "fecha": "2026-03-29",
+      "familias": [
+        {
+          "familia_id": "ropa",
+          "en_promocion": 1
+        }
+      ]
+    },
+    "status": 422,
+    "respuesta": {
+      "detail": "Ninguna familia de la solicitud es válida"
+    }
+  },
+  {
+    "caso": "Cuerpo que no es JSON",
+    "solicitud": "POST /v1/prediccion",
+    "cuerpo": "{tienda_id: 5",
+    "status": 422,
+    "respuesta": {
+      "detail": "El cuerpo no es JSON válido"
+    }
+  },
+  {
+    "caso": "Observación sin registros válidos",
+    "solicitud": "POST /v1/observaciones",
+    "cuerpo": {
+      "tienda_id": 5,
+      "fecha": "2026-03-28",
+      "ventas": [
+        {
+          "familia_id": "bebe",
+          "ventas": -3
+        }
+      ]
+    },
+    "status": 422,
+    "respuesta": {
+      "detail": "Ningún registro de ventas es válido"
+    }
+  },
+  {
+    "caso": "Varios problemas a la vez",
+    "solicitud": "POST /v1/prediccion",
+    "cuerpo": {
+      "Tienda": "T05",
+      "date": "29/03/2026",
+      "items": [
+        {
+          "familia": "LÁCTEOS",
+          "promo": "2"
+        },
+        {
+          "familia_id": "limpiesa",
+          "en_promocion": null
+        }
+      ],
+      "canal": "pos"
+    },
+    "status": 200,
+    "respuesta": {
+      "tienda_id": 5,
+      "fecha": "2026-03-29",
+      "version_modelo": "5",
+      "predicciones": [
+        {
+          "familia_id": "lacteos",
+          "venta_esperada": 816.7,
+          "cantidad_sugerida": 809
+        },
+        {
+          "familia_id": "limpieza",
+          "venta_esperada": 290.8,
+          "cantidad_sugerida": 413
+        },
+        {
+          "familia_id": "abarrotes",
+          "venta_esperada": 1209.7,
+          "cantidad_sugerida": 1585
+        },
+        {
+          "familia_id": "bebe",
+          "venta_esperada": 92.1,
+          "cantidad_sugerida": 131
+        },
+        {
+          "familia_id": "bebidas",
+          "venta_esperada": 1046.6,
+          "cantidad_sugerida": 1329
+        },
+        {
+          "familia_id": "carnes",
+          "venta_esperada": 373.3,
+          "cantidad_sugerida": 373
+        },
+        {
+          "familia_id": "cuidado_personal",
+          "venta_esperada": 232.0,
+          "cantidad_sugerida": 334
+        },
+        {
+          "familia_id": "frutas_verduras",
+          "venta_esperada": 482.9,
+          "cantidad_sugerida": 454
+        },
+        {
+          "familia_id": "licores",
+          "venta_esperada": 90.1,
+          "cantidad_sugerida": 142
+        },
+        {
+          "familia_id": "mascotas",
+          "venta_esperada": 60.8,
+          "cantidad_sugerida": 76
+        },
+        {
+          "familia_id": "panaderia",
+          "venta_esperada": 392.4,
+          "cantidad_sugerida": 361
+        },
+        {
+          "familia_id": "snacks",
+          "venta_esperada": 401.5,
+          "cantidad_sugerida": 486
+        }
+      ],
+      "calidad": {
+        "estado": "advertencia",
+        "observaciones": [
+          {
+            "campo": "Tienda",
+            "accion": "reparar",
+            "detalle": "campo 'Tienda' se interpretó como 'tienda_id'"
+          },
+          {
+            "campo": "date",
+            "accion": "reparar",
+            "detalle": "campo 'date' se interpretó como 'fecha'"
+          },
+          {
+            "campo": "items",
+            "accion": "reparar",
+            "detalle": "campo 'items' se interpretó como 'familias'"
+          },
+          {
+            "campo": "canal",
+            "accion": "advertir",
+            "detalle": "campo 'canal' no reconocido; se ignoró"
+          },
+          {
+            "campo": "tienda_id",
+            "accion": "reparar",
+            "detalle": "'T05' se interpretó como 5"
+          },
+          {
+            "campo": "fecha",
+            "accion": "reparar",
+            "detalle": "'29/03/2026' se interpretó como 2026-03-29"
+          },
+          {
+            "campo": "familias[0].familia",
+            "accion": "reparar",
+            "detalle": "campo 'familia' se interpretó como 'familia_id'"
+          },
+          {
+            "campo": "familias[0].promo",
+            "accion": "reparar",
+            "detalle": "campo 'promo' se interpretó como 'en_promocion'"
+          },
+          {
+            "campo": "familias[0].familia_id",
+            "accion": "reparar",
+            "detalle": "'LÁCTEOS' se interpretó como 'lacteos'"
+          },
+          {
+            "campo": "familias[0].en_promocion",
+            "accion": "reparar",
+            "detalle": "'2' se interpretó como 2"
+          },
+          {
+            "campo": "familias[1].familia_id",
+            "accion": "advertir",
+            "detalle": "'limpiesa' no existe; por parecido se supuso 'limpieza'"
+          },
+          {
+            "campo": "familias[1].en_promocion",
+            "accion": "advertir",
+            "detalle": "sin dato de promoción; se supuso 0"
+          },
+          {
+            "campo": "familias",
+            "accion": "advertir",
+            "detalle": "faltan familias que la tienda vende: ['abarrotes', 'bebe', 'bebidas', 'carnes', 'cuidado_personal', 'frutas_verduras', 'licores', 'mascotas', 'panaderia', 'snacks']; se agregaron con en_promocion=0"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "caso": "Modelo vigente",
+    "solicitud": "GET /modelo",
+    "cuerpo": null,
+    "status": 200,
+    "respuesta": {
+      "nombre": "novamercado-pronostico",
+      "alias": "vigente",
+      "version": "5"
+    }
+  },
+  {
+    "caso": "Estado del servicio",
+    "solicitud": "GET /health",
+    "cuerpo": null,
+    "status": 200,
+    "respuesta": {
+      "estado": "ok",
+      "version_modelo": "5"
+    }
+  },
+  {
+    "caso": "Ejecución de reentrenamiento desconocida",
+    "solicitud": "GET /admin/reentrenar/rt_no_existe",
+    "cuerpo": null,
+    "status": 404,
+    "respuesta": {
+      "detail": "Ejecución 'rt_no_existe' desconocida"
+    }
+  }
+]

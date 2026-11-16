@@ -90,6 +90,15 @@ class FechaInterpretada:
 
 
 def a_fecha(v: Any) -> FechaInterpretada:
+    try:
+        return _a_fecha(v)
+    except ValueError as e:
+        if str(e).startswith(repr(v)):  # mensaje propio, ya en español
+            raise
+        raise ValueError(f"{v!r} no es una fecha válida del calendario") from None  # p. ej. 30 de febrero
+
+
+def _a_fecha(v: Any) -> FechaInterpretada:
     if not isinstance(v, str):
         raise ValueError(f"{v!r} no es una fecha en texto")
     s = v.strip()

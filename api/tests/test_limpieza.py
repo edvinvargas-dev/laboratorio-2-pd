@@ -161,6 +161,12 @@ def test_fecha_imposible_se_rechaza(ctx, pred, valor):
         limpiar_prediccion(pred, ctx)
 
 
+def test_fecha_imposible_explica_en_espanol(ctx, pred):
+    pred["fecha"] = "2026-02-30"
+    with pytest.raises(Rechazo, match="no es una fecha válida del calendario"):
+        limpiar_prediccion(pred, ctx)
+
+
 def test_fecha_posterior_al_calendario_se_advierte(ctx, pred):
     pred["fecha"] = "2027-03-01"
     _, o = limpiar_prediccion(pred, ctx)

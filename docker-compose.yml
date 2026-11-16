@@ -89,11 +89,11 @@ services:
       mlflow server --host 0.0.0.0 --port 5000 --workers 1
       --backend-store-uri sqlite:////mlflow/mlflow.db
       --artifacts-destination /mlflow/artifacts --serve-artifacts
-      --allowed-hosts "mlflow,mlflow:5000,localhost,localhost:5000,127.0.0.1,127.0.0.1:5000"
+      --allowed-hosts "mlflow,mlflow:*,localhost,localhost:*,127.0.0.1,127.0.0.1:*"
     volumes:
       - mlflow_datos:/mlflow
     ports:
-      - "${MLFLOW_PORT_HOST:-5000}:5000"
+      - "${MLFLOW_PORT_HOST:-5050}:5000"   # 5050 en el host: en macOS el 5000 lo usa AirPlay
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=3)"]
       interval: 10s

@@ -56,7 +56,7 @@
   },
   "status": 200,
   "respuesta": {
-    "registros_guardados": 0,
+    "registros_guardados": 12,
     "calidad": {
       "estado": "ok",
       "observaciones": []

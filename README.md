@@ -16,7 +16,7 @@ o sobrar. También:
               sigue el alias    │      POST /admin/reentrenar
               "vigente" (15 s)  │                 │
                      ┌──────────▼──────┐   ┌──────▼──────────────────┐
-                     │ mlflow (:5000)  │◀──│ airflow (:8080)          │──▶ airflow-db
+                     │ mlflow (:5050)  │◀──│ airflow (:8080)          │──▶ airflow-db
                      │ runs + registry │   │ DAG reentrenamiento      │
                      └─────────────────┘   └──────────────────────────┘
   arranque: al levantar, carga el histórico y entrena el primer modelo si no existe.
@@ -30,7 +30,8 @@ Las decisiones técnicas y de producto, con sus alternativas, están en
 ## Levantar el producto desde cero
 
 **Requisitos:** Docker con Docker Compose v2, al menos **6 GB de RAM** asignados a Docker
-y los puertos 8000, 5000, 8080 y 5433 libres.
+y los puertos 8000, 5050, 8080 y 5433 libres. Los puertos de MLflow, Airflow y la base se
+pueden cambiar en `.env`; el de la API (8000) es parte del contrato.
 
 1. **Clonar el repositorio en el tag de entrega**
 
@@ -116,7 +117,7 @@ curl http://localhost:8000/health
 | Interfaz | URL | Acceso |
 |---|---|---|
 | API (Swagger) | http://localhost:8000/docs | — |
-| MLflow | http://localhost:5000 | — |
+| MLflow | http://localhost:5050 | — |
 | Airflow | http://localhost:8080 | usuario `AIRFLOW_USUARIO` y clave `AIRFLOW_CLAVE` de `.env` |
 
 ### Scripts de prueba (requieren Python con pandas)

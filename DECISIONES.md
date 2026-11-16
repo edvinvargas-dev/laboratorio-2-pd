@@ -228,6 +228,10 @@ Los factores siguen al cuantil crítico: licores 1.47 (q* = 0.95), panadería 0.
 
   Un id que Airflow no conoce responde 404. Como Airflow guarda las ejecuciones, el
   estado se puede consultar aunque la API se reinicie.
+- **`version` en una ejecución fallida es la versión que el servicio está usando.** Si
+  MLflow está caído no se puede consultar el alias. Caso observado: se promovió la
+  versión 5, MLflow cayó antes de la siguiente revisión del servicio (cada 15 s) y el
+  servicio siguió con la 4. Al volver MLflow cargó la 5 sola.
 - **Airflow caído o el DAG no disponible:** `POST /admin/reentrenar` responde 503, igual
   que la consulta de estado. `/health` pasa a `degradado`.
 - `max_active_runs=1`: dos disparos seguidos se ejecutan uno tras otro.
@@ -293,3 +297,49 @@ calibración). Diferencias de ese orden se explican por eso y por ruido.
   vigente.
 - Usar MAE como criterio: el negocio paga el costo de la cantidad sugerida, no el error
   del pronóstico.
+
+---
+
+## 9. Contenedores y operación
+
+- **Servicio `arranque`** (misma imagen que la API). Corre en cada `up`: aplica el esquema,
+  carga el histórico si falta y, **solo si no hay modelo `vigente`**, ejecuta el pipeline
+  y registra el primero. Al volver a levantar termina en segundos sin repetir trabajo. Si
+  falla, Docker lo reintenta (`restart: on-failure`).
+  **Alternativa descartada:** que la API dispare el DAG si no hay modelo. Haría depender el
+  primer arranque de Airflow, que es el componente más lento en estar listo.
+- **La API no depende del arranque para iniciar.** Mientras no haya modelo, `/health`
+  responde 503, como dice el contrato. Arranca con la caché del modelo (volumen
+  `api_cache_modelo`), así que después de un `down`/`up` sirve antes de que MLflow y
+  Airflow estén listos (a los 27 s en la prueba).
+- **Versiones fijas:** `python:3.12.14-slim-bookworm`, `postgres:17.6-bookworm`,
+  `ghcr.io/mlflow/mlflow:v3.17.2`, `apache/airflow:3.3.2-python3.12`, y dependencias de
+  Python fijadas en `ml/requirements.txt` y `api/requirements.txt`.
+- **Datos y credenciales fuera de las imágenes:** `.dockerignore` excluye `data/` y `.env`.
+  Los datos se montan en modo solo lectura desde `./data`, y las credenciales llegan por
+  variables de entorno desde `.env`.
+- **Puertos en el host:** API 8000 (contrato), MLflow 5050 (en macOS el 5000 lo usa
+  AirPlay), Airflow 8080 y la base 5433. Todos menos el de la API se pueden cambiar en
+  `.env`.
+- **Memoria:** MLflow con un worker y Airflow en un contenedor. Todo el producto usa unos
+  2.5 GB.
+
+---
+
+## 10. Evaluación propia
+
+`scripts/evaluador.py` reproduce la evaluación descrita en el enunciado sobre el producto
+**clonado desde GitHub y levantado desde cero**: 28 días con observaciones antes de los
+pronósticos, 30% de solicitudes con defectos fuera del catálogo, reentrenamientos
+semanales, caída de MLflow, `down`/`up` y demanda ×1.3 desde el día 14.
+
+**Resultado** (`evidencia/evaluacion.md`):
+- **0 errores de contrato** en 3 204 predicciones.
+- **Costo 39% menor** que el baseline.
+- Cada promoción se adoptó en ≤ 6 s.
+- `/health` reflejó la caída de MLflow en 14 s y la vuelta en 12 s.
+- Tras el `down`/`up`, `ok` en 31 s.
+
+Las ventas "reales" simuladas son las del histórico de 52 semanas antes (mismo día de la
+semana). Esto no reproduce feriados móviles, así que el resultado es una referencia, no
+una predicción del puntaje.
